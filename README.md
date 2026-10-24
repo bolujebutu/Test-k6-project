@@ -57,7 +57,7 @@ python mock/quickpizza_stub.py 8000 0.15     # 15% of 200 responses break the ru
 k6 run -e PROFILE=smoke -e BASE_URL=http://127.0.0.1:8000 src/pizza-test.js
 ```
 
-The report then shows **0% HTTP failures but about 15% business errors**, and the run fails its SLA. That is the kind of defect a status-code-only check would miss.
+The report then shows **0% HTTP failures but a clear share of business errors** (roughly the bug rate you set), and the run fails its SLA. That is the kind of defect a status-code-only check would miss.
 
 ## Findings
 
