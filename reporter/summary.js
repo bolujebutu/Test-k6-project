@@ -36,6 +36,12 @@ export function buildSummary(data, profile, meta) {
   ];
   const allChecks = [...responseTimes, ...rates];
 
+  // Why requests failed, most common first
+  const failureReasons = Object.entries(meta.failureRules || {})
+    .map(([rule, label]) => ({ rule, label, count: (m[`fail_${rule}`] && m[`fail_${rule}`].values.count) || 0 }))
+    .filter((r) => r.count > 0)
+    .sort((a, b) => b.count - a.count);
+
   return {
     title: "QuickPizza API - Performance Test Report",
     endpoint: `POST ${meta.baseUrl}/api/pizza`,
@@ -51,6 +57,7 @@ export function buildSummary(data, profile, meta) {
     },
     responseTimes,
     rates,
+    failureReasons,
     overall: allChecks.every((c) => c.status === "PASS") ? "PASS" : "FAIL",
   };
 }

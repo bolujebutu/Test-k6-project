@@ -10,6 +10,9 @@ on:
         description: "Test profile (smoke, baseline, load, stress)"
         default: "smoke"
 
+env:
+  PROFILE: ${{ github.event.inputs.profile || 'smoke' }}
+
 jobs:
   performance:
     runs-on: ubuntu-latest
@@ -20,7 +23,34 @@ jobs:
         uses: grafana/setup-k6-action@v1
 
       - name: Run k6 test
-        run: k6 run --no-usage-report -e PROFILE=${{ github.event.inputs.profile || 'smoke' }} src/pizza-test.js
+        run: k6 run --no-usage-report -e PROFILE=$PROFILE src/pizza-test.js
+
+      # Show the results on the run page: a summary table plus one annotation per SLA check
+      - name: Publish results
+        if: always()
+        run: |
+          f="reports/${PROFILE}-summary.json"
+          if [ ! -f "$f" ]; then echo "::error::No summary file was produced"; exit 0; fi
+
+          {
+            echo "## k6 ${PROFILE} test: $(jq -r .overall "$f")"
+            echo
+            jq -r '"\(.totals.requests) requests, \(.totals.successful) passed, \(.totals.failed) failed, \(.totals.rps) req/s, peak \(.peakUsers) users"' "$f"
+            echo
+            echo "| Check | Target | Actual | Result |"
+            echo "|---|---|---|---|"
+            jq -r '(.responseTimes[] | "| \(.metric) response (ms) | \(.expected) | \(.actual) | \(.status) |"), (.rates[] | "| \(.metric) | \(.expected) | \(.actual) | \(.status) |")' "$f"
+            echo
+            if [ "$(jq '.failureReasons | length' "$f")" -gt 0 ]; then
+              echo "### Failure reasons"
+              echo "| Reason | Requests |"
+              echo "|---|---|"
+              jq -r '.failureReasons[] | "| \(.label) | \(.count) |"' "$f"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          jq -r '(.responseTimes[], .rates[]) | "::\(if .status == "PASS" then "notice" else "error" end) title=\(.metric)::\(.status): actual \(.actual), target \(.expected)"' "$f"
+          jq -r '.failureReasons[] | "::warning title=Failure reason::\(.label): \(.count) requests"' "$f"
 
       - name: Upload HTML report
         if: always()

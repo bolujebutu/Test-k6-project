@@ -26,6 +26,10 @@ ${s.responseTimes.map((c) => row(c)).join("\n")}
 ${line()}
 ${s.rates.map((c) => row(c)).join("\n")}
 
+  FAILURE REASONS
+${line()}
+${s.failureReasons.length ? s.failureReasons.map((r) => `  ${r.label.padEnd(44)}${String(r.count).padStart(8)}`).join("\n") : "  None - every request passed"}
+
 ${line()}
   OVERALL: ${paint(s.overall, s.overall === "PASS" ? "PASS - all SLA targets met" : "FAIL - one or more SLA targets missed")}
   HTML report: reports/${s.profile.name}-report.html

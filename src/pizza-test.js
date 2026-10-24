@@ -30,6 +30,21 @@ const businessErrors = new Rate("business_errors");
 const successful = new Counter("successful_requests");
 const failed = new Counter("failed_requests");
 
+// One counter per failure reason, so reports show *why* requests failed, not just how many.
+export const FAILURE_RULES = {
+  http_error: "HTTP error (non-200 or timeout)",
+  no_pizza: "No pizza in response",
+  invalid_json: "Response was not valid JSON",
+  topping_count: "Topping count outside requested range",
+  calories: "Calories over requested limit",
+  vegetarian: "Not vegetarian when requested",
+  excluded_ingredient: "Contains an excluded ingredient",
+  excluded_tool: "Uses an excluded tool",
+};
+const failureCounters = Object.fromEntries(
+  Object.keys(FAILURE_RULES).map((rule) => [rule, new Counter(`fail_${rule}`)])
+);
+
 // ---------- k6 options: load shape + pass/fail thresholds from the SLA ----------
 export const options = {
   scenarios: {
@@ -55,25 +70,27 @@ export const options = {
 
 // ---------- Business rules: is the pizza we got back actually valid? ----------
 export function validatePizza(body, rules) {
+  // Each problem is { rule, detail } so it can be both counted and logged.
   const problems = [];
+  const add = (rule, detail) => problems.push({ rule, detail });
   const pizza = body && body.pizza;
-  if (!pizza || !pizza.id || !pizza.name) return ["No pizza returned"];
+  if (!pizza || !pizza.id || !pizza.name) return [{ rule: "no_pizza", detail: "No pizza returned" }];
 
   const ingredients = pizza.ingredients || [];
   const names = ingredients.map((i) => i.name);
 
   if (ingredients.length < rules.minNumberOfToppings || ingredients.length > rules.maxNumberOfToppings) {
-    problems.push(`Topping count ${ingredients.length} outside ${rules.minNumberOfToppings}-${rules.maxNumberOfToppings}`);
+    add("topping_count", `Topping count ${ingredients.length} outside ${rules.minNumberOfToppings}-${rules.maxNumberOfToppings}`);
   }
   if (typeof body.calories === "number" && body.calories > rules.maxCaloriesPerSlice) {
-    problems.push(`Calories ${body.calories} over limit ${rules.maxCaloriesPerSlice}`);
+    add("calories", `Calories ${body.calories} over limit ${rules.maxCaloriesPerSlice}`);
   }
   if (rules.mustBeVegetarian && body.vegetarian === false) {
-    problems.push("Vegetarian requested but pizza is not vegetarian");
+    add("vegetarian", "Vegetarian requested but pizza is not vegetarian");
   }
   const banned = names.filter((n) => rules.excludedIngredients.includes(n));
-  if (banned.length) problems.push(`Contains excluded ingredient(s): ${banned.join(", ")}`);
-  if (rules.excludedTools.includes(pizza.tool)) problems.push(`Uses excluded tool: ${pizza.tool}`);
+  if (banned.length) add("excluded_ingredient", `Contains excluded ingredient(s): ${banned.join(", ")}`);
+  if (rules.excludedTools.includes(pizza.tool)) add("excluded_tool", `Uses excluded tool: ${pizza.tool}`);
 
   return problems;
 }
@@ -100,7 +117,7 @@ export default function () {
     try {
       problems = validatePizza(res.json(), rules);
     } catch (e) {
-      problems = ["Response was not valid JSON"];
+      problems = [{ rule: "invalid_json", detail: "Response was not valid JSON" }];
     }
     businessErrors.add(problems.length > 0);
   }
@@ -115,7 +132,11 @@ export default function () {
     successful.add(1);
   } else {
     failed.add(1);
-    const reason = res.status !== 200 ? `HTTP ${res.status}` : problems.join("; ");
+    if (res.status !== 200) failureCounters.http_error.add(1);
+    problems.forEach((p) => failureCounters[p.rule].add(1));
+    const reason = res.status !== 200
+      ? `HTTP ${res.status}${res.error ? " (" + res.error + ")" : ""}`
+      : problems.map((p) => p.detail).join("; ");
     console.warn(`[${ref}] FAILED: ${reason}`);
   }
 
@@ -124,7 +145,7 @@ export default function () {
 
 // ---------- Reports: console summary + HTML file ----------
 export function handleSummary(data) {
-  const summary = buildSummary(data, PROFILE, { baseUrl: BASE_URL, tester: TESTER });
+  const summary = buildSummary(data, PROFILE, { baseUrl: BASE_URL, tester: TESTER, failureRules: FAILURE_RULES });
   return {
     stdout: cliReport(summary),
     [`reports/${PROFILE.name}-report.html`]: htmlReport(summary),
