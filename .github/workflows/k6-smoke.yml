@@ -42,15 +42,15 @@ jobs:
             jq -r '(.responseTimes[] | "| \(.metric) response (ms) | \(.expected) | \(.actual) | \(.status) |"), (.rates[] | "| \(.metric) | \(.expected) | \(.actual) | \(.status) |")' "$f"
             echo
             if [ "$(jq '.failureReasons | length' "$f")" -gt 0 ]; then
-              echo "### Failure reasons"
-              echo "| Reason | Requests |"
-              echo "|---|---|"
-              jq -r '.failureReasons[] | "| \(.label) | \(.count) |"' "$f"
+              echo "### Failure reasons and known issues"
+              echo "| Reason | Type | Requests |"
+              echo "|---|---|---|"
+              jq -r '.failureReasons[] | "| \(.label) | \(if .knownIssue then "Known issue" else "Failure" end) | \(.count) |"' "$f"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           jq -r '(.responseTimes[], .rates[]) | "::\(if .status == "PASS" then "notice" else "error" end) title=\(.metric)::\(.status): actual \(.actual), target \(.expected)"' "$f"
-          jq -r '.failureReasons[] | "::warning title=Failure reason::\(.label): \(.count) requests"' "$f"
+          jq -r '.failureReasons[] | "::warning title=\(if .knownIssue then "Known issue" else "Failure reason" end)::\(.label): \(.count) requests"' "$f"
 
       - name: Upload HTML report
         if: always()

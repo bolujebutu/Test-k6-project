@@ -38,7 +38,11 @@ export function buildSummary(data, profile, meta) {
 
   // Why requests failed, most common first
   const failureReasons = Object.entries(meta.failureRules || {})
-    .map(([rule, label]) => ({ rule, label, count: (m[`fail_${rule}`] && m[`fail_${rule}`].values.count) || 0 }))
+    .map(([rule, label]) => ({
+      rule, label,
+      count: (m[`fail_${rule}`] && m[`fail_${rule}`].values.count) || 0,
+      knownIssue: (meta.knownIssues || []).includes(rule),
+    }))
     .filter((r) => r.count > 0)
     .sort((a, b) => b.count - a.count);
 

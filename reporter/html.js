@@ -52,7 +52,7 @@ h1{margin:0;font-size:clamp(22px,4vw,30px)}h2{margin:0 0 10px;font-size:17px}.mu
 .kpi b{display:block;font-size:24px;font-variant-numeric:tabular-nums}.kpi span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-top:12px}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--muted);font-weight:600}
-.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px}
+.pill.known{background:var(--line);color:var(--fg)}.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px}
 svg{width:100%;height:auto}.lbl,.val{font-size:12px;fill:var(--fg)}rect.ok{fill:var(--ok)}rect.bad{fill:var(--bad)}.tgt{stroke:var(--tgt);stroke-width:2;stroke-dasharray:3 2}
 .legend{font-size:12px;color:var(--muted)}.scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
@@ -90,10 +90,10 @@ svg{width:100%;height:auto}.lbl,.val{font-size:12px;fill:var(--fg)}rect.ok{fill:
   <div class="scroll">${table(s.rates, "%")}</div>
 </section>
 
-<section class="card"><h2>Failure reasons</h2>
+<section class="card"><h2>Failure reasons and known issues</h2>
   ${s.failureReasons.length
-    ? `<div class="scroll"><table><thead><tr><th>Reason</th><th>Requests</th><th>Share of all requests</th></tr></thead><tbody>
-      ${s.failureReasons.map((r) => `<tr><td>${esc(r.label)}</td><td>${fmt(r.count)}</td><td>${fmt(s.totals.successful + s.totals.failed ? (r.count / (s.totals.successful + s.totals.failed)) * 100 : 0)}%</td></tr>`).join("")}
+    ? `<div class="scroll"><table><thead><tr><th>Reason</th><th>Type</th><th>Requests</th><th>Share of all requests</th></tr></thead><tbody>
+      ${s.failureReasons.map((r) => `<tr><td>${esc(r.label)}</td><td><span class="pill ${r.knownIssue ? "known" : "bad"}">${r.knownIssue ? "Known issue" : "Failure"}</span></td><td>${fmt(r.count)}</td><td>${fmt(s.totals.successful + s.totals.failed ? (r.count / (s.totals.successful + s.totals.failed)) * 100 : 0)}%</td></tr>`).join("")}
       </tbody></table></div>`
     : `<p class="muted">None. Every request returned HTTP 200 with a pizza that met all restrictions.</p>`}
 </section>
