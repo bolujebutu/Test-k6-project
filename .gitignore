@@ -1,0 +1,5 @@
+reports/*.html
+reports/*.json
+!reports/.gitkeep
+node_modules/
+.env

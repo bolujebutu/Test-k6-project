@@ -1,0 +1,30 @@
+name: k6 smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Test profile (smoke, baseline, load, stress)"
+        default: "smoke"
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6 test
+        run: k6 run --no-usage-report -e PROFILE=${{ github.event.inputs.profile || 'smoke' }} src/pizza-test.js
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-report
+          path: reports/
